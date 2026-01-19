@@ -1,0 +1,604 @@
+<!-- 
+    ★ 紧急求助：iPhone/微信 打不开怎么办？ ★
+    
+    【现象】
+    如果您点开文件看到的是一堆英文代码，说明您的手机把它当成了记事本。
+    
+    【解决方法 A：改名复活法（推荐）】
+    1. 打开手机桌面上蓝色的“文件”APP。
+    2. 找到此文件，【长按】它 -> 选择【重命名】。
+    3. 把文件名改成：计算器.html (重点是后缀必须是 .html)。
+    4. 系统提示时，选择“使用 .html”。
+    5. 再点击文件，就能完美运行了。
+    
+    【解决方法 B：发链接（最省事）】
+    建议发送者将此代码粘贴到 jsrun.net 或 codepen.io 生成一个链接，
+    直接发链接给朋友，无需下载，体验最佳。
+-->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>深圳石岩羽毛球馆投资回报计算器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif; 
+            -webkit-tap-highlight-color: transparent;
+            background-color: #f3f4f6;
+        }
+        /* 优化iOS安全区域 */
+        .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+        
+        /* 隐藏滚动条但保留功能 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* 更现代的滑块样式 */
+        input[type=range] {
+            -webkit-appearance: none; background: transparent; width: 100%;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%;
+            background: #ffffff; border: 0.5px solid rgba(0,0,0,0.1);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15); margin-top: -8px; 
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 4px; background: #e5e7eb; border-radius: 2px;
+        }
+        
+        /* 点击反馈动画 */
+        .active-scale:active { transform: scale(0.95); }
+    </style>
+</head>
+<body class="text-slate-800">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect } = React;
+
+        // 图标组件
+        const Icon = ({ d, className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d={d} />
+            </svg>
+        );
+
+        function App() {
+            // --- 状态定义 ---
+            const [numCourts, setNumCourts] = useState(6);
+            const [rentPerSqm, setRentPerSqm] = useState(32); 
+            const [courtSize, setCourtSize] = useState(150); 
+            const [revenuePerCourt, setRevenuePerCourt] = useState(6300); 
+            
+            // 地板配置
+            const costKeelFloor = 130; 
+            const costMatOnly = 50;    
+            const [numKeelCourts, setNumKeelCourts] = useState(6); 
+            
+            // --- 新增：能耗详细配置 (改为直接控制日均度数) ---
+            const [numAc, setNumAc] = useState(4); 
+            const [numLights, setNumLights] = useState(36); 
+            const [elecPrice, setElecPrice] = useState(1.5); 
+            const [waterCost, setWaterCost] = useState(300); 
+            
+            // 核心状态：单台日均耗电度数
+            const [acDailyKwh, setAcDailyKwh] = useState(6); // 默认非夏季，约3kw*2h
+            const [lightDailyKwh, setLightDailyKwh] = useState(1.2); // 默认0.2kw*6h
+
+            // 财务模块Tab状态
+            const [financeTab, setFinanceTab] = useState('overview');
+
+            // 联动逻辑：当场地数量变化时，自动调整建议的灯光数量 (6盏/片)
+            useEffect(() => {
+                setNumLights(numCourts * 6);
+                setNumKeelCourts(Math.min(numKeelCourts, numCourts));
+            }, [numCourts]);
+            
+            // 运营配置 (夏季模式联动)
+            const [summerMode, setSummerMode] = useState(false); 
+
+            // 切换夏季模式时，自动调整空调日均耗电量的建议值
+            useEffect(() => {
+                if (summerMode) {
+                    setAcDailyKwh(24); // 夏季建议：3kw * 8h = 24度
+                } else {
+                    setAcDailyKwh(6);  // 日常建议：3kw * 2h = 6度
+                }
+            }, [summerMode]);
+            
+            // 人员配置
+            const [hasManager, setHasManager] = useState(true); 
+            const [managerSalary, setManagerSalary] = useState(4000);
+            const [hasCoach, setHasCoach] = useState(false); 
+            const [coachSalary, setCoachSalary] = useState(10000);
+            const [hasCleaner, setHasCleaner] = useState(false); 
+            const [cleanerSalary, setCleanerSalary] = useState(3000);
+            const [hasMarketing, setHasMarketing] = useState(false); 
+            const [marketingCost, setMarketingCost] = useState(1500);
+
+            // 自定义费用
+            const [customExpenses, setCustomExpenses] = useState([]);
+            const addExpense = () => {
+                const newId = Date.now();
+                // 新增 enabled: true 字段，默认启用
+                setCustomExpenses([...customExpenses, { id: newId, name: '杂项支出', cost: 1000, enabled: true }]);
+            };
+            const updateExpense = (id, field, val) => {
+                setCustomExpenses(customExpenses.map(c => c.id === id ? { ...c, [field]: val } : c));
+            };
+            const removeExpense = (id) => setCustomExpenses(customExpenses.filter(c => c.id !== id));
+
+            // --- 计算逻辑 ---
+            const calculations = useMemo(() => {
+                // 1. 场地与装修投资
+                const totalArea = numCourts * courtSize;
+                const actualKeel = Math.min(numKeelCourts, numCourts);
+                const actualMat = numCourts - actualKeel;
+                const investFloor = (actualKeel * courtSize * costKeelFloor) + (actualMat * courtSize * costMatOnly);
+                
+                // 2. 硬件投资
+                const investHardware = (numAc * 4000) + (numLights * 500); 
+                
+                // 3. 其他杂项投资
+                const otherInvest = (investHardware + investFloor) * 0.05;
+                const totalInvest = investHardware + investFloor + otherInvest;
+
+                // 4. 月固定支出
+                const monthlyRent = totalArea * rentPerSqm;
+                const monthlyStaff = (hasManager ? managerSalary : 0) + (hasCoach ? coachSalary : 0) + (hasCleaner ? cleanerSalary : 0);
+                
+                // 5. 电费详细计算 (直接用日均度数算)
+                const monthlyAcKwh = numAc * acDailyKwh * 30;
+                const monthlyAcElec = monthlyAcKwh * elecPrice;
+
+                const monthlyLightKwh = numLights * lightDailyKwh * 30;
+                const monthlyLightElec = monthlyLightKwh * elecPrice;
+
+                const monthlyElec = monthlyAcElec + monthlyLightElec;
+                const totalMonthlyKwh = monthlyAcKwh + monthlyLightKwh;
+                
+                // 6. 其他月支出 (只计算 enabled 为 true 的杂项)
+                const activeCustomExpenses = customExpenses.filter(c => c.enabled !== false).reduce((a,b)=>a+Number(b.cost),0);
+                const monthlyOther = (hasMarketing ? marketingCost : 0) + 200 + waterCost + activeCustomExpenses; 
+                
+                const totalMonthlyCost = monthlyRent + monthlyStaff + monthlyElec + monthlyOther;
+                const monthlyRevenue = numCourts * revenuePerCourt;
+                const monthlyProfit = monthlyRevenue - totalMonthlyCost;
+                const roiMonths = monthlyProfit > 0 ? totalInvest / monthlyProfit : 999;
+
+                return { 
+                    totalInvest, investFloor, investHardware, otherInvest,
+                    totalMonthlyCost, monthlyProfit, monthlyRevenue, roiMonths, 
+                    monthlyRent, monthlyStaff, monthlyElec, totalMonthlyKwh,
+                    monthlyAcElec, monthlyLightElec, monthlyOther
+                };
+            }, [numCourts, rentPerSqm, courtSize, revenuePerCourt, numKeelCourts, summerMode, hasManager, managerSalary, hasCoach, coachSalary, hasCleaner, cleanerSalary, hasMarketing, marketingCost, customExpenses, numAc, acDailyKwh, numLights, lightDailyKwh, elecPrice, waterCost]);
+
+            // --- 分享功能 ---
+            const handleShare = () => {
+                const text = `🏸 羽毛球馆投资回报分析
+----------------
+【场地规模】${numCourts}片
+【月总支出】${Math.floor(calculations.totalMonthlyCost)}元
+----------------
+⚡️ 电费配置 (${summerMode ? '夏季' : '日常'})
+• 电价：${elecPrice}元/度
+• 空调费：${Math.floor(calculations.monthlyAcElec)}元/月
+• 灯光费：${Math.floor(calculations.monthlyLightElec)}元/月
+• 总电费：${Math.floor(calculations.monthlyElec)}元/月
+----------------
+📊 最终结果
+${calculations.monthlyProfit > 0 ? '✅ 盈利中' : '⚠️ 亏损中'}
+• 预估月纯利：${Math.floor(calculations.monthlyProfit)}元
+• 回本周期：${calculations.roiMonths > 120 ? '>10年' : Math.ceil(calculations.roiMonths) + '个月'}
+
+(此数据由投资回报计算器生成)`;
+                
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert("✅ 分析报告已复制！");
+                } catch (err) {
+                    alert("复制失败。");
+                }
+                document.body.removeChild(textArea);
+            };
+
+            return (
+                <div className="flex flex-col h-screen bg-slate-100">
+                    
+                    {/* 顶部标题栏 */}
+                    <div className="bg-white px-4 py-3 shadow-sm z-10 flex justify-between items-center shrink-0">
+                        <div>
+                            <h1 className="text-base font-bold text-slate-800">投资回报计算器</h1>
+                        </div>
+                        <div className="flex items-center gap-3">
+                             <span className={`text-xs px-2 py-1 rounded-full font-medium ${calculations.monthlyProfit > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                {calculations.monthlyProfit > 0 ? '盈利中' : '亏损中'}
+                            </span>
+                            <button onClick={handleShare} className="text-blue-600 active-scale p-1">
+                                <Icon d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" className="w-5 h-5"/>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* 可滚动的主内容区 */}
+                    <div className="flex-1 overflow-y-auto no-scrollbar p-3 pb-32 space-y-3">
+                        
+                        {/* 模块1: 基础栅格配置 */}
+                        <div className="bg-white rounded-xl p-3 shadow-sm">
+                            <h2 className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider">核心参数配置</h2>
+                            <div className="grid grid-cols-2 gap-3 mb-4">
+                                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                    <div className="flex justify-between text-xs text-slate-500 mb-1">总场地</div>
+                                    <div className="flex items-baseline gap-1 mb-2">
+                                        <span className="text-xl font-bold text-blue-600">{numCourts}</span>
+                                        <span className="text-xs">片</span>
+                                    </div>
+                                    <input type="range" min="4" max="20" value={numCourts} onChange={e=>setNumCourts(Number(e.target.value))} className="accent-blue-600"/>
+                                </div>
+                                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                    <div className="flex justify-between text-xs text-slate-500 mb-1">龙骨数</div>
+                                    <div className="flex items-baseline gap-1 mb-2">
+                                        <span className="text-xl font-bold text-emerald-600">{Math.min(numKeelCourts, numCourts)}</span>
+                                        <span className="text-xs">片</span>
+                                    </div>
+                                    <input type="range" min="0" max={numCourts} value={Math.min(numKeelCourts, numCourts)} onChange={e=>setNumKeelCourts(Number(e.target.value))} className="accent-emerald-600"/>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2">
+                                <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                    <label className="text-[10px] text-slate-400 block mb-1">租金(元/平)</label>
+                                    <input type="number" value={rentPerSqm} onChange={e=>setRentPerSqm(Number(e.target.value))} className="w-full bg-transparent font-bold text-slate-700 text-base outline-none p-0"/>
+                                </div>
+                                <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                    <label className="text-[10px] text-slate-400 block mb-1">单片营收</label>
+                                    <input type="number" value={revenuePerCourt} onChange={e=>setRevenuePerCourt(Number(e.target.value))} className="w-full bg-transparent font-bold text-slate-700 text-base outline-none p-0"/>
+                                </div>
+                                <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                    <label className="text-[10px] text-slate-400 block mb-1">面积(平)</label>
+                                    <input type="number" value={courtSize} onChange={e=>setCourtSize(Number(e.target.value))} className="w-full bg-transparent font-bold text-slate-700 text-base outline-none p-0"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 模块2: 能耗与水电配置 (升级版) */}
+                        <div className="bg-white rounded-xl p-3 shadow-sm">
+                            <h2 className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider flex items-center gap-1">
+                                <Icon d="M13 10V3L4 14h7v7l9-11h-7z" className="w-3 h-3" />
+                                能耗与水电
+                            </h2>
+                            
+                            {/* 公共费率配置区 */}
+                            <div className="grid grid-cols-2 gap-3 mb-4">
+                                <div className="bg-blue-50/50 border border-blue-100 p-2 rounded-lg flex justify-between items-center">
+                                    <label className="text-xs text-blue-800 shrink-0">电费单价</label>
+                                    <div className="flex items-center flex-1 justify-end min-w-0">
+                                        <input type="number" step="0.1" value={elecPrice} onChange={e=>setElecPrice(Number(e.target.value))} className="w-16 text-right bg-transparent font-bold text-blue-700 outline-none border-b border-blue-200 focus:border-blue-500 mr-1"/>
+                                        <span className="text-[10px] text-blue-400 shrink-0">元/度</span>
+                                    </div>
+                                </div>
+                                <div className="bg-slate-50 p-2 rounded-lg flex justify-between items-center">
+                                    <label className="text-xs text-slate-500 shrink-0">水费预算</label>
+                                    <div className="flex items-center flex-1 justify-end min-w-0">
+                                        <input type="number" value={waterCost} onChange={e=>setWaterCost(Number(e.target.value))} className="w-16 text-right bg-transparent font-bold text-slate-700 outline-none mr-1"/>
+                                        <span className="text-[10px] text-slate-400 shrink-0">元</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* 空调配置 (直接度数) */}
+                            <div className="mb-4 border-b border-slate-100 pb-3">
+                                <div className="flex justify-between items-center mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm font-medium text-slate-700">空调系统</span>
+                                        <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded flex items-center">
+                                            <input type="number" value={numAc} onChange={e=>setNumAc(Number(e.target.value))} className="w-10 bg-transparent text-center outline-none font-medium"/>台
+                                        </span>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-sm font-bold text-blue-600">
+                                            ¥{Math.floor(calculations.monthlyAcElec)}
+                                            <span className="text-xs font-normal text-slate-400">/月</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex items-center gap-3">
+                                    <div className="flex-1">
+                                        <div className="flex justify-between text-[10px] text-slate-400 mb-1">
+                                            <span>单台每天耗电</span>
+                                            <span className="text-blue-600 font-bold">{acDailyKwh}度</span>
+                                        </div>
+                                        <input type="range" min="0" max="60" step="1" value={acDailyKwh} onChange={e=>setAcDailyKwh(Number(e.target.value))} className="accent-blue-500"/>
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="flex justify-between text-[10px] text-slate-400 mb-1">
+                                            <span>数量调整</span>
+                                            <span>{numAc}台</span>
+                                        </div>
+                                        <input type="range" min="0" max="20" value={numAc} onChange={e=>setNumAc(Number(e.target.value))} className="accent-blue-500"/>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 灯光配置 (直接度数) */}
+                            <div className="mb-2">
+                                <div className="flex justify-between items-center mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm font-medium text-slate-700">灯光照明</span>
+                                        <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded flex items-center">
+                                            <input type="number" value={numLights} onChange={e=>setNumLights(Number(e.target.value))} className="w-10 bg-transparent text-center outline-none font-medium"/>盏
+                                        </span>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-sm font-bold text-yellow-600">
+                                            ¥{Math.floor(calculations.monthlyLightElec)}
+                                            <span className="text-xs font-normal text-slate-400">/月</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex items-center gap-3">
+                                    <div className="flex-1">
+                                        <div className="flex justify-between text-[10px] text-slate-400 mb-1">
+                                            <span>单盏每天耗电</span>
+                                            <span className="text-yellow-600 font-bold">{lightDailyKwh}度</span>
+                                        </div>
+                                        <input type="range" min="0" max="5" step="0.1" value={lightDailyKwh} onChange={e=>setLightDailyKwh(Number(e.target.value))} className="accent-yellow-500"/>
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="flex justify-between text-[10px] text-slate-400 mb-1">
+                                            <span>数量调整</span>
+                                            <span>{numLights}盏</span>
+                                        </div>
+                                        <input type="range" min="0" max="200" value={numLights} onChange={e=>setNumLights(Number(e.target.value))} className="accent-yellow-500"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 模块3: 夏季模式卡片 */}
+                        <div className={`rounded-xl p-3 shadow-sm border transition-all duration-300 flex items-center justify-between ${summerMode ? 'bg-orange-50 border-orange-200' : 'bg-white border-transparent'}`}>
+                            <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-full ${summerMode ? 'bg-orange-100 text-orange-500' : 'bg-slate-100 text-slate-400'}`}>
+                                    <Icon className="w-5 h-5" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                                </div>
+                                <div>
+                                    <div className={`text-sm font-bold ${summerMode ? 'text-orange-800' : 'text-slate-700'}`}>深圳夏季模式</div>
+                                    <div className="text-[10px] opacity-60">开启后自动增加预设的空调耗电量</div>
+                                </div>
+                            </div>
+                            <button onClick={() => setSummerMode(!summerMode)} className={`w-11 h-6 rounded-full relative transition-colors ${summerMode ? 'bg-orange-500' : 'bg-slate-300'}`}>
+                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${summerMode ? 'translate-x-6' : 'translate-x-1'}`}></div>
+                            </button>
+                        </div>
+
+                        {/* 模块4: 支出配置 */}
+                        <div className="bg-white rounded-xl p-3 shadow-sm">
+                            <h2 className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider">人员与杂项</h2>
+                            <div className="grid grid-cols-1 gap-2">
+                                {[
+                                    {label: '全职馆主', on: hasManager, set: setHasManager, val: managerSalary, setVal: setManagerSalary, color: 'text-blue-600'},
+                                    {label: '驻场教练', on: hasCoach, set: setHasCoach, val: coachSalary, setVal: setCoachSalary, color: 'text-purple-600'},
+                                    {label: '保洁杂工', on: hasCleaner, set: setHasCleaner, val: cleanerSalary, setVal: setCleanerSalary, color: 'text-cyan-600'},
+                                    {label: '美团推广', on: hasMarketing, set: setHasMarketing, val: marketingCost, setVal: setMarketingCost, color: 'text-pink-600'},
+                                ].map((item, i) => (
+                                    <div key={i} className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg">
+                                        <div className="flex items-center gap-2">
+                                            <div 
+                                                onClick={() => item.set(!item.on)}
+                                                className={`w-5 h-5 rounded border flex items-center justify-center cursor-pointer ${item.on ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'}`}
+                                            >
+                                                {item.on && <Icon className="w-3.5 h-3.5 text-white" d="M5 13l4 4L19 7" />}
+                                            </div>
+                                            <span className={`text-sm font-medium ${item.on ? 'text-slate-700' : 'text-slate-400'}`}>{item.label}</span>
+                                        </div>
+                                        {item.on ? (
+                                            <div className="flex items-center">
+                                                <span className="text-xs text-slate-400 mr-1">¥</span>
+                                                <input type="number" value={item.val} onChange={e=>item.setVal(Number(e.target.value))} className={`w-14 text-right bg-transparent font-bold text-sm outline-none ${item.color}`}/>
+                                            </div>
+                                        ) : <span className="text-xs text-slate-300">未启用</span>}
+                                    </div>
+                                ))}
+
+                                {/* 自定义费用 (优化版：与上方风格一致) */}
+                                {customExpenses.map(exp => (
+                                    <div key={exp.id} className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg transition-colors hover:bg-slate-100">
+                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                            {/* 复选框 (开关) */}
+                                            <div 
+                                                onClick={() => updateExpense(exp.id, 'enabled', !exp.enabled)}
+                                                className={`w-5 h-5 shrink-0 rounded border flex items-center justify-center cursor-pointer transition-colors ${exp.enabled ? 'bg-indigo-500 border-indigo-500' : 'bg-white border-slate-300'}`}
+                                            >
+                                                {exp.enabled && <Icon className="w-3.5 h-3.5 text-white" d="M5 13l4 4L19 7" />}
+                                            </div>
+
+                                            {/* 名称输入 (无边框，融入背景) */}
+                                            <div className="relative flex-1 min-w-0 flex items-center">
+                                                <input 
+                                                    type="text" 
+                                                    value={exp.name} 
+                                                    onChange={e=>updateExpense(exp.id, 'name', e.target.value)} 
+                                                    className={`bg-transparent text-sm w-full outline-none transition-colors ${exp.enabled ? 'text-slate-700 font-medium' : 'text-slate-400 line-through'}`}
+                                                />
+                                            </div>
+                                            
+                                            {/* 删除按钮 (紧跟名称) */}
+                                            <button 
+                                                onClick={()=>removeExpense(exp.id)} 
+                                                className="w-6 h-6 flex items-center justify-center text-slate-300 hover:text-red-500 active:scale-90 transition-all"
+                                                title="删除此项"
+                                            >
+                                                <Icon d="M6 18L18 6M6 6l12 12" className="w-3 h-3"/>
+                                            </button>
+                                        </div>
+
+                                        {/* 金额输入 */}
+                                        {exp.enabled ? (
+                                            <div className="flex items-center shrink-0 ml-2">
+                                                <span className="text-xs text-slate-400 mr-1">¥</span>
+                                                <input 
+                                                    type="number" 
+                                                    value={exp.cost} 
+                                                    onChange={e=>updateExpense(exp.id, 'cost', Number(e.target.value))} 
+                                                    className="w-14 text-right bg-transparent font-bold text-sm outline-none text-indigo-600 border-b border-transparent focus:border-indigo-200 transition-colors"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-slate-300 shrink-0 ml-2">未启用</span>
+                                        )}
+                                    </div>
+                                ))}
+                                
+                                <button onClick={addExpense} className="mt-1 w-full py-2.5 border border-dashed border-slate-300 text-slate-500 text-xs font-medium rounded-lg hover:bg-slate-50 hover:border-slate-400 active:bg-slate-100 transition-all flex items-center justify-center gap-1">
+                                    <span className="text-lg leading-none">+</span> 添加自定义支出
+                                </button>
+                            </div>
+                        </div>
+
+                         {/* 模块5: 财务仪表盘 (支持Tab切换) */}
+                         <div className="bg-white rounded-xl p-3 shadow-sm mb-4">
+                            <div className="flex justify-between items-center mb-3">
+                                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">财务透视</h2>
+                                <div className="flex bg-slate-100 p-0.5 rounded-lg">
+                                    <button 
+                                        onClick={()=>setFinanceTab('overview')}
+                                        className={`px-3 py-1 rounded-md text-[10px] font-medium transition-all ${financeTab==='overview' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-400'}`}
+                                    >概况</button>
+                                    <button 
+                                        onClick={()=>setFinanceTab('detail')}
+                                        className={`px-3 py-1 rounded-md text-[10px] font-medium transition-all ${financeTab==='detail' ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-400'}`}
+                                    >明细</button>
+                                </div>
+                            </div>
+                            
+                            {financeTab === 'overview' ? (
+                                /* 概况视图 */
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="bg-slate-50 p-3 rounded-lg">
+                                        <div className="text-[10px] text-slate-400 mb-1">总启动资金</div>
+                                        <div className="font-bold text-slate-700 text-sm">¥{Math.floor(calculations.totalInvest/10000)}<span className="text-xs">万</span></div>
+                                    </div>
+                                    <div className="bg-slate-50 p-3 rounded-lg">
+                                        <div className="text-[10px] text-slate-400 mb-1">每月总固定支出</div>
+                                        <div className="font-bold text-slate-700 text-sm">¥{Math.floor(calculations.totalMonthlyCost).toLocaleString()}</div>
+                                    </div>
+                                    <div className="bg-slate-50 p-3 rounded-lg">
+                                        <div className="text-[10px] text-slate-400 mb-1">月租金成本</div>
+                                        <div className="font-bold text-slate-700 text-sm">¥{Math.floor(calculations.monthlyRent).toLocaleString()}</div>
+                                    </div>
+                                    <div className="bg-orange-50 p-3 rounded-lg border border-orange-100">
+                                        <div className="text-[10px] text-orange-400 mb-1">预计电费</div>
+                                        <div className="font-bold text-orange-600 text-sm">¥{Math.floor(calculations.monthlyElec).toLocaleString()}</div>
+                                        <div className="text-[10px] text-orange-400/60 mt-0.5">{Math.floor(calculations.totalMonthlyKwh)}度</div>
+                                    </div>
+                                </div>
+                            ) : (
+                                /* 明细视图 */
+                                <div className="space-y-3">
+                                    {/* 月度收支表 */}
+                                    <div>
+                                        <div className="text-[10px] text-slate-400 mb-2 font-bold pl-1">月度收支表</div>
+                                        <div className="bg-slate-50 rounded-lg p-3 space-y-2 text-xs">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-slate-500">预估营收</span>
+                                                <span className="font-bold text-slate-700">+{Math.floor(calculations.monthlyRevenue)}</span>
+                                            </div>
+                                            <div className="h-px bg-slate-200 my-1"></div>
+                                            <div className="flex justify-between items-center text-slate-500">
+                                                <span>场地租金</span>
+                                                <span>-{Math.floor(calculations.monthlyRent)}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-slate-500">
+                                                <span>人工薪资</span>
+                                                <span>-{Math.floor(calculations.monthlyStaff)}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-slate-500">
+                                                <span>电费支出</span>
+                                                <span>-{Math.floor(calculations.monthlyElec)}</span>
+                                            </div>
+                                             <div className="flex justify-between items-center text-slate-500">
+                                                <span>其他杂项</span>
+                                                <span>-{Math.floor(calculations.monthlyOther)}</span>
+                                            </div>
+                                            <div className="h-px bg-slate-200 my-1"></div>
+                                            <div className="flex justify-between items-center font-bold">
+                                                <span className="text-slate-700">月纯利润</span>
+                                                <span className={calculations.monthlyProfit > 0 ? 'text-red-500' : 'text-green-600'}>
+                                                    {calculations.monthlyProfit > 0 ? '+' : ''}{Math.floor(calculations.monthlyProfit)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 投资构成表 */}
+                                    <div>
+                                        <div className="text-[10px] text-slate-400 mb-2 font-bold pl-1">投资构成表</div>
+                                        <div className="bg-slate-50 rounded-lg p-3 space-y-2 text-xs">
+                                            <div className="flex justify-between items-center text-slate-500">
+                                                <span>硬件设施 (空调/灯)</span>
+                                                <span>{Math.floor(calculations.investHardware)}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-slate-500">
+                                                <span>地面工程 (龙骨/胶)</span>
+                                                <span>{Math.floor(calculations.investFloor)}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-slate-500">
+                                                <span>其他杂项 (预估5%)</span>
+                                                <span>{Math.floor(calculations.otherInvest)}</span>
+                                            </div>
+                                             <div className="h-px bg-slate-200 my-1"></div>
+                                            <div className="flex justify-between items-center font-bold">
+                                                <span className="text-slate-700">总投资额</span>
+                                                <span>{Math.floor(calculations.totalInvest)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* 底部固定总控台 */}
+                    <div className="bg-white border-t border-slate-200 p-4 safe-bottom fixed bottom-0 w-full shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-50">
+                        <div className="flex items-center justify-between">
+                            <div className="flex flex-col">
+                                <span className="text-xs text-slate-400 mb-0.5">预估月纯利</span>
+                                <div className={`text-2xl font-bold leading-none ${calculations.monthlyProfit > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                    <span className="text-sm align-top mr-0.5">¥</span>
+                                    {Math.floor(calculations.monthlyProfit).toLocaleString()}
+                                </div>
+                            </div>
+                            
+                            <div className="h-8 w-px bg-slate-200 mx-4"></div>
+
+                            <div className="flex flex-col items-end min-w-[80px]">
+                                <span className="text-xs text-slate-400 mb-0.5">回本周期</span>
+                                <div className="text-xl font-bold text-slate-800 leading-none flex items-baseline">
+                                    {calculations.roiMonths > 120 ? '>10' : Math.ceil(calculations.roiMonths)}
+                                    <span className="text-xs font-normal text-slate-500 ml-1">个月</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
